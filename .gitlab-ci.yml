@@ -18,24 +18,28 @@ run_tests:
 
 build_image:
   stage: build
-  image: docker:20.10.16
-  services:
-    - docker:20.10.16-dind
+  image: docker:20.10.16  # job purpose DOCKER container 
+  services: # services helps link docker 1 to docker 2 and build communication
+    - docker:20.10.16-dind # service docker container , this is docker in docker concept, we need 2 docker s to excute this kind cmds
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_CERTDIR: "/certs" # two dockers talk to eath other by athentication with this certs
   before_script:
-    - docker login -u $REGISTRY_USER -p $REGISTRY_PASS
+    - docker login -u $REGISTRY_USER -p $REGISTRY_PASS # logging in docker hub
   script:
-    - docker build -t $IMAGE_NAME:$IMAGE_TAG .
-    - docker push $IMAGE_NAME:$IMAGE_TAG
-
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG .   # building docker image
+    - docker push $IMAGE_NAME:$IMAGE_TAG        #pushing to docker hub
+ 
 
 deploy:
   stage: deploy
   before_script:
-    - chmod 400 $SSH_KEY
+    - chmod 400 $SSH_KEY #By default gitlab give r/w permissions to all, to restrict our ssh key for others we write this
   script:
-    - ssh -o StrictHostKeyChecking=no -i $SSH_KEY root@161.35.223.117 "
-        docker login -u $REGISTRY_USER -p $REGISTRY_PASS &&
-        docker ps -aq | xargs docker stop | xargs docker rm &&
+    - ssh -o StrictHostKeyChecking=no -i $SSH_KEY root@161.35.223.117 "  # to aviod manual interaction to accept login authentication fingerprint in ssh 
+                                                                         # we used -o StrictHostKeyChecking=no
+        docker login -u $REGISTRY_USER -p $REGISTRY_PASS && # login before pull image from docker hub
+        docker ps -aq | xargs docker stop | xargs docker rm && # 
         docker run -d -p 5000:5000 $IMAGE_NAME:$IMAGE_TAG"
+
+        # On first execution/first build ,   docker run -d -p 5000:5000 $IMAGE_NAME:$IMAGE_TAG" this will block port 5000, says already in use for further build
+        # Hence we are stopping and previous run and port usage of 5000 with  docker ps -aq | xargs docker stop | xargs docker rm && and && we used this for chaining mutiple commands
